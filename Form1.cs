@@ -15,11 +15,11 @@ namespace MyJSON {
 		}
 
 		private void button1_Click(object sender, EventArgs e) {
-			emsg.Text = JSONF.newObject(
-				new Pair<string,JSONF>("name", "abc"),
-				new Pair<string,JSONF>("height", 1.77),
-				new Pair<string,JSONF>("email", "123212331212"),
-				new Pair<string,JSONF>("contacts", JSONF.newArray(
+			emsg.Text = JSON.newObject(
+				("name", "abc"),
+				("height", 1.77),
+				("email", "123212331212"),
+				("contacts", JSON.newArray(
 					"contact 1",
 					"contact 2",
 					"contact 3"
@@ -28,15 +28,15 @@ namespace MyJSON {
 		}
 
 		private void button2_Click(object sender, EventArgs e) {
-			var js = JSONF.Parse(einput.Text);
+			var js = JSON.Parse(einput.Text);
 			var sb = new StringBuilder();
-			if(js.type == JSONF.NodeType.Array) {
+			if(js.type == JSON.NodeType.Array) {
 				foreach(var v in js.Vals)
 					sb.Append('[').Append(v.type.ToString()).Append("] ").Append(v.Value).Append("\r\n");
 			}
-			else if(js.type == JSONF.NodeType.Object) {
-				foreach(var v in js.KeyVals)
-					sb.Append(v.key).Append(" = ").Append('[').Append(v.value.type.ToString()).Append("] ").Append(v.value.Value).Append("\r\n");
+			else if(js.type == JSON.NodeType.Object) {
+				foreach(var (k,v) in js.KeyVals)
+					sb.Append(k).Append(" = ").Append('[').Append(v.type.ToString()).Append("] ").Append(v.Value).Append("\r\n");
 			}
 			sb.Append("\r\njs[2].list[1] = ").Append(js[2]["list"][1]);
 			emsg.Text = sb.ToString();

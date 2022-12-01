@@ -9,24 +9,24 @@ using System.Text;
 
 namespace Q.JSON {
 
-	public struct JSONF : IEnumerable<JSONF> {
-		public static JSONF NOTEXIST = new JSONF(NodeType.NotExist, default, null);
+	public struct JSON : IEnumerable<JSON> {
+		public static JSON NOTEXIST = new JSON(NodeType.NotExist, default, null);
 		static DateTime EPOCH = new DateTime(1970, 1, 1);
 
 		public enum NodeType { Null = 0, Array, Object, Int, Long, Float, Double, DateTime, Bool, Decimal, String, CustomObject, Expression, NotExist }
 		public NodeType type;
 		public DWord val; //i32 i64 float double datetime
 		public object oval;
-		public JSONF(NodeType type, DWord val, object oval) {
+		public JSON(NodeType type, DWord val, object oval) {
 			this.type = type;
 			this.val = val;
 			this.oval = oval;
 		}
 
-		public ref JSONF this[int index] {
+		public ref JSON this[int index] {
 			get {
 				if(type == NodeType.Array) {
-					var arr = oval as RefList<JSONF>;
+					var arr = oval as RefList<JSON>;
 					if(index >= 0 && index < arr.Count)
 						return ref arr[index];
 				}
@@ -34,10 +34,10 @@ namespace Q.JSON {
 			}
 		}
 
-		public ref JSONF this[string key] {
+		public ref JSON this[string key] {
 			get {
 				if(type == NodeType.Object) {
-					var arr = oval as RefDict<string,JSONF>;
+					var arr = oval as RefDict<string,JSON>;
 					if(arr.posmap.TryGetValue(key, out int pos))
 						return ref arr.items[pos];
 					else {
@@ -49,9 +49,9 @@ namespace Q.JSON {
 			}
 		}
 
-		public ref JSONF get(string key) {
+		public ref JSON get(string key) {
 			if(type == NodeType.Object) {
-				var arr = oval as RefDict<string,JSONF>;
+				var arr = oval as RefDict<string,JSON>;
 				if(arr.posmap.TryGetValue(key, out int pos))
 					return ref arr.items[pos];
 			}
@@ -60,34 +60,34 @@ namespace Q.JSON {
 
 		public int Count {
 			get {
-				if(type == NodeType.Array) return (oval as RefList<JSONF>).Count;
-				else if(type == NodeType.Object) return (oval as RefDict<string, JSONF>).Count;
+				if(type == NodeType.Array) return (oval as RefList<JSON>).Count;
+				else if(type == NodeType.Object) return (oval as RefDict<string, JSON>).Count;
 				else return 0;
 			}
 		}
 
-		public void Add(string key, JSONF value) {
+		public void Add(string key, JSON value) {
 			if(type != NodeType.Object) return;
-			var map = oval as RefDict<string, JSONF>;
+			var map = oval as RefDict<string, JSON>;
 			if(map.posmap.TryGetValue(key, out int pos))
 				map.items[pos] = value;
 			else map.Add(key, value);
 		}
 
-		public void Add(JSONF value) {
+		public void Add(JSON value) {
 			if(type != NodeType.Array) return;
-			var arr = oval as RefList<JSONF>;
+			var arr = oval as RefList<JSON>;
 			arr.Add(value);
 		}
 
 		public void Clear() {
-			if(type == NodeType.Array) (oval as RefList<JSONF>).Clear();
-			else if(type == NodeType.Object) (oval as RefDict<string, JSONF>).Clear();
+			if(type == NodeType.Array) (oval as RefList<JSON>).Clear();
+			else if(type == NodeType.Object) (oval as RefDict<string, JSON>).Clear();
 		}
 
 		public void EnsureCapacity(int capacity) {
-			if(type == NodeType.Array) (oval as RefList<JSONF>).Capacity = capacity;
-			else if(type == NodeType.Object) (oval as RefDict<string, JSONF>).Capacity = capacity;
+			if(type == NodeType.Array) (oval as RefList<JSON>).Capacity = capacity;
+			else if(type == NodeType.Object) (oval as RefDict<string, JSON>).Capacity = capacity;
 		}
 
 		public string Value {
@@ -247,8 +247,8 @@ namespace Q.JSON {
 					case NodeType.Double: return val.dval != 0;
 					case NodeType.Bool: return val.boolval;
 					case NodeType.Decimal: return ((decimal)oval) != 0;
-					case NodeType.Array: return (oval as RefList<JSONF>).Count > 0;
-					case NodeType.Object: return (oval as RefDict<string,JSONF>).Count > 0;
+					case NodeType.Array: return (oval as RefList<JSON>).Count > 0;
+					case NodeType.Object: return (oval as RefDict<string,JSON>).Count > 0;
 					default: return false;
 				}
 			}
@@ -259,67 +259,67 @@ namespace Q.JSON {
 			}
 		}
 
-		public static JSONF newArray(int capacity = 0) {
-			return new JSONF(NodeType.Array, default, new RefList<JSONF>(capacity));
+		public static JSON newArray(int capacity = 0) {
+			return new JSON(NodeType.Array, default, new RefList<JSON>(capacity));
 		}
 
-		public static JSONF newObject(int capacity = 0, StringComparer scmp = null) {
-			return new JSONF(NodeType.Object, default, new RefDict<string, JSONF>(capacity, scmp));
+		public static JSON newObject(int capacity = 0, StringComparer scmp = null) {
+			return new JSON(NodeType.Object, default, new RefDict<string, JSON>(capacity, scmp));
 		}
 
-		public static JSONF newArray(params JSONF[] items) {
-			var list = new RefList<JSONF>();
+		public static JSON newArray(params JSON[] items) {
+			var list = new RefList<JSON>();
 			list.AddRange(items);
-			return new JSONF(NodeType.Array, default, list);
+			return new JSON(NodeType.Array, default, list);
 		}
 
-		public static JSONF newObject(params Pair<string, JSONF>[] items) {
-			var map = new RefDict<string, JSONF>();
-			foreach(var v in items)
-				map.Add(v.key, v.value);
-			return new JSONF(NodeType.Object, default, map);
+		public static JSON newObject(params (string, JSON)[] items) {
+			var map = new RefDict<string, JSON>();
+			foreach(var (k,v) in items)
+				map.Add(k, v);
+			return new JSON(NodeType.Object, default, map);
 		}
-		public static JSONF NULL => new JSONF(NodeType.Null, default, null);
-		public static JSONF newData(int v) => new JSONF(NodeType.Int, DWord.make(v), null);
-		public static JSONF newData(long v) => new JSONF(NodeType.Long, DWord.make(v), null);
-		public static JSONF newData(float v) => new JSONF(NodeType.Float, DWord.make(v), null);
-		public static JSONF newData(double v) => new JSONF(NodeType.Double, DWord.make(v), null);
-		public static JSONF newData(DateTime v) => new JSONF(NodeType.DateTime, DWord.make(v), null);
-		public static JSONF newData(bool v) => new JSONF(NodeType.Bool, DWord.make(v ? 1 : 0), null);
-		public static JSONF newData(decimal v) => new JSONF(NodeType.Decimal, default, v);
-		public static JSONF newData(string v) => new JSONF(NodeType.String, default, v);
-		public static JSONF newCustomData(object v) => new JSONF(NodeType.CustomObject, default, v);
+		public static JSON NULL => new JSON(NodeType.Null, default, null);
+		public static JSON newData(int v) => new JSON(NodeType.Int, DWord.make(v), null);
+		public static JSON newData(long v) => new JSON(NodeType.Long, DWord.make(v), null);
+		public static JSON newData(float v) => new JSON(NodeType.Float, DWord.make(v), null);
+		public static JSON newData(double v) => new JSON(NodeType.Double, DWord.make(v), null);
+		public static JSON newData(DateTime v) => new JSON(NodeType.DateTime, DWord.make(v), null);
+		public static JSON newData(bool v) => new JSON(NodeType.Bool, DWord.make(v ? 1 : 0), null);
+		public static JSON newData(decimal v) => new JSON(NodeType.Decimal, default, v);
+		public static JSON newData(string v) => new JSON(NodeType.String, default, v);
+		public static JSON newCustomData(object v) => new JSON(NodeType.CustomObject, default, v);
 
-		public static implicit operator JSONF(bool b) => JSONF.newData(b);
-		public static implicit operator JSONF(int b) => JSONF.newData(b);
-		public static implicit operator JSONF(long b) => JSONF.newData(b);
-		public static implicit operator JSONF(float b) => JSONF.newData(b);
-		public static implicit operator JSONF(double b) => JSONF.newData(b);
-		public static implicit operator JSONF(DateTime b) => JSONF.newData(b);
-		public static implicit operator JSONF(decimal b) => JSONF.newData(b);
-		public static implicit operator JSONF(string b) => JSONF.newData(b);
-		public static implicit operator string(JSONF b) => b.Value;
+		public static implicit operator JSON(bool b) => JSON.newData(b);
+		public static implicit operator JSON(int b) => JSON.newData(b);
+		public static implicit operator JSON(long b) => JSON.newData(b);
+		public static implicit operator JSON(float b) => JSON.newData(b);
+		public static implicit operator JSON(double b) => JSON.newData(b);
+		public static implicit operator JSON(DateTime b) => JSON.newData(b);
+		public static implicit operator JSON(decimal b) => JSON.newData(b);
+		public static implicit operator JSON(string b) => JSON.newData(b);
+		public static implicit operator string(JSON b) => b.Value;
 
-		public IEnumerator<JSONF> GetEnumerator() {
+		public IEnumerator<JSON> GetEnumerator() {
 			if(type == NodeType.Array) {
-				foreach(var v in (RefList<JSONF>)oval)
+				foreach(var v in (RefList<JSON>)oval)
 					yield return v;
 			}
 			else if(type == NodeType.Object) {
-				foreach(var v in (RefDict<string,JSONF>)oval)
-					yield return v.value;
+				foreach(var v in (RefDict<string,JSON>)oval)
+					yield return v.Item2;
 			}
 		}
 
-		public IEnumerable<JSONF> Vals {
+		public IEnumerable<JSON> Vals {
 			get {
 				if(type == NodeType.Array) {
-					foreach(var v in (RefList<JSONF>)oval)
+					foreach(var v in (RefList<JSON>)oval)
 						yield return v;
 				}
 				else if(type == NodeType.Object) {
-					foreach(var v in (RefDict<string,JSONF>)oval)
-						yield return v.value;
+					foreach(var v in (RefDict<string,JSON>)oval)
+						yield return v.Item2;
 				}
 			}
 		}
@@ -327,16 +327,16 @@ namespace Q.JSON {
 		public IEnumerable<string> Keys {
 			get {
 				if(type == NodeType.Object) {
-					foreach(var v in (RefDict<string,JSONF>)oval)
-						yield return v.key;
+					foreach(var v in (RefDict<string,JSON>)oval)
+						yield return v.Item1;
 				}
 			}
 		}
 
-		public IEnumerable<Pair<string,JSONF>> KeyVals {
+		public IEnumerable<(string,JSON)> KeyVals {
 			get {
 				if(type == NodeType.Object) {
-					foreach(var v in (RefDict<string, JSONF>)oval)
+					foreach(var v in (RefDict<string, JSON>)oval)
 						yield return v;
 				}
 			}
@@ -344,12 +344,12 @@ namespace Q.JSON {
 
 		IEnumerator IEnumerable.GetEnumerator() {
 			if(type == NodeType.Array) {
-				foreach(var v in (RefList<JSONF>)oval)
+				foreach(var v in (RefList<JSON>)oval)
 					yield return v;
 			}
 			else if(type == NodeType.Object) {
-				foreach(var v in (RefDict<string,JSONF>)oval)
-					yield return v.value;
+				foreach(var v in (RefDict<string,JSON>)oval)
+					yield return v.Item2;
 			}
 		}
 
@@ -375,7 +375,7 @@ namespace Q.JSON {
 			int i, j, len;
 			switch(type) {
 				case NodeType.Array:
-					var arr = oval as RefList<JSONF>;
+					var arr = oval as RefList<JSON>;
 					sb.Append('[');
 					if(pre >= 0) {
 						sb.Append("\r\n");
@@ -399,7 +399,7 @@ namespace Q.JSON {
 					sb.Append(']');
 					break;
 				case NodeType.Object:
-					var map = oval as RefDict<string,JSONF>;
+					var map = oval as RefDict<string,JSON>;
 					sb.Append('{');
 					if(pre >= 0) {
 						sb.Append("\r\n");
@@ -485,9 +485,9 @@ namespace Q.JSON {
 			}
 		}
 
-		public static JSONF Parse(string aJSON, bool runexp = true) {
-			Stack<JSONF> stack = new Stack<JSONF>();
-			JSONF ctx = new JSONF(NodeType.Null, default, null);//源码初值为null
+		public static JSON Parse(string aJSON, bool runexp = true) {
+			Stack<JSON> stack = new Stack<JSON>();
+			JSON ctx = new JSON(NodeType.Null, default, null);//源码初值为null
 			int i = 0;
 			var sToken = new StringBuilder(64);
 			string TokenName = "";
@@ -684,7 +684,7 @@ namespace Q.JSON {
 			}
 		}
 
-		static JSONF t1(string s, int quotemode = 0, bool runexp = false) {
+		static JSON t1(string s, int quotemode = 0, bool runexp = false) {
 			if(quotemode != 0)
 				return s;
 			switch (s) {
@@ -692,7 +692,7 @@ namespace Q.JSON {
 				case "false": return false;
 				case "null": return NULL;
 				default:
-					var d = new JSONF(NodeType.Expression, default, s);
+					var d = new JSON(NodeType.Expression, default, s);
 					if (runexp) d.ParseExpression();
 					return d;
 			}
@@ -734,7 +734,7 @@ namespace Q.JSON {
 			{typeof(char),TypeEnum.Char},
 			{typeof(DateTime),TypeEnum.Datetime},
 		};
-		public static JSONF ToJSONData(object o) {
+		public static JSON ToJSONData(object o) {
 			if(o == null) return NULL;
 			if(TYPEENUMMAP.TryGetValue(o.GetType(), out var typ)) {
 				switch(typ) {
@@ -883,16 +883,7 @@ namespace Q.JSON {
 		public ref T this[int index] => ref arr[index];
 	}
 
-	public struct Pair<K, V> {
-		public K key;
-		public V value;
-		public Pair(K key, V value) {
-			this.key = key;
-			this.value = value;
-		}
-	}
-
-	public class RefDict<K, V> : IEnumerable<Pair<K,V>> {
+	public class RefDict<K, V> : IEnumerable<(K,V)> {
 		public Dictionary<K, int> posmap = new Dictionary<K, int>();
 		public RefList<V> items = new RefList<V>();
 		public List<int> emptypos = new List<int>();
@@ -960,14 +951,14 @@ namespace Q.JSON {
 			return false;
 		}
 
-		public IEnumerator<Pair<K, V>> GetEnumerator() {
+		public IEnumerator<(K, V)> GetEnumerator() {
 			foreach(var v in posmap)
-				yield return new Pair<K, V>(v.Key, items[v.Value]);
+				yield return (v.Key, items[v.Value]);
 		}
 
 		IEnumerator IEnumerable.GetEnumerator() {
 			foreach(var v in posmap)
-				yield return new Pair<K, V>(v.Key, items[v.Value]);
+				yield return (v.Key, items[v.Value]);
 		}
 	}
 
