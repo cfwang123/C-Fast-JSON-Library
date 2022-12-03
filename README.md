@@ -52,15 +52,16 @@ js.ToString(0); //indented
 
 3. Access JSON fields
 ```cs
-MessageBox.Show(js["name"].Value);
-MessageBox.Show(js["height"].AsFloat.ToString());
-MessageBox.Show(js["height"].AsInt.ToString());
-MessageBox.Show(js["contacts"].Count);
+MessageBox.Show(js["name"].Value); //abc
+MessageBox.Show(js["height"].AsFloat.ToString()); //1.77
+MessageBox.Show(js["height"].AsInt.ToString()); //1
+MessageBox.Show(js["contacts"].Count); //3
 foreach(JSON v in js["contacts"].Vals)
 	MessageBox.Show(v.Value);
 foreach((string k, JSON v) in js.KeyVals)
 	MessageBox.Show(k + " = " + v.Value);
-MessageBox.Show(js["aaa"].Value); //not existing field return default values(empty string)
+MessageBox.Show(js["aaa"].Value); //"", not existing field return default values(empty string)
+MessageBox.Show(js["not"]["exist"]["path"][0][0].AsInt); //0
 ```
 
 4. Modify fields
