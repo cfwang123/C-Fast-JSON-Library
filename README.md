@@ -56,8 +56,10 @@ MessageBox.Show(js["name"].Value);
 MessageBox.Show(js["height"].AsFloat.ToString());
 MessageBox.Show(js["height"].AsInt.ToString());
 MessageBox.Show(js["contacts"].Count);
-foreach(var v in js["contacts"].Vals)
+foreach(JSON v in js["contacts"].Vals)
 	MessageBox.Show(v.Value);
+foreach((string k, JSON v) in js.KeyVals)
+	MessageBox.Show(k + " = " + v.Value);
 MessageBox.Show(js["aaa"].Value); //not existing field return default values(empty string)
 ```
 
