@@ -40,5 +40,12 @@ namespace Q {
 			sb.Append("\r\njs[2].list[1] = ").Append(js[2]["list"][1]);
 			emsg.Text = sb.ToString();
 		}
+
+		private void button3_Click(object sender, EventArgs e) {
+			var js = JSON.newArray(1, 1234, 12345, 1234567890, 12.333f, 0, new DateTime(2022, 1, 1, 10, 11, 12));
+			var b = JSONB.GenBytes(js);
+			var s = js.ToString();
+			emsg.Text = b.Length + ": " +JSON.bin2hex(b) + "\r\n" + s.Length + ": " + s;
+		}
 	}
 }

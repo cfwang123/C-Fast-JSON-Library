@@ -28,6 +28,7 @@ namespace Q {
 			this.einput = new System.Windows.Forms.TextBox();
 			this.emsg = new System.Windows.Forms.TextBox();
 			this.button2 = new System.Windows.Forms.Button();
+			this.button3 = new System.Windows.Forms.Button();
 			this.SuspendLayout();
 			// 
 			// button1
@@ -68,6 +69,16 @@ namespace Q {
 			this.button2.UseVisualStyleBackColor = true;
 			this.button2.Click += new System.EventHandler(this.button2_Click);
 			// 
+			// button3
+			// 
+			this.button3.Location = new System.Drawing.Point(456, 12);
+			this.button3.Name = "button3";
+			this.button3.Size = new System.Drawing.Size(75, 23);
+			this.button3.TabIndex = 0;
+			this.button3.Text = "Binary";
+			this.button3.UseVisualStyleBackColor = true;
+			this.button3.Click += new System.EventHandler(this.button3_Click);
+			// 
 			// Form1
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 12F);
@@ -76,6 +87,7 @@ namespace Q {
 			this.Controls.Add(this.emsg);
 			this.Controls.Add(this.einput);
 			this.Controls.Add(this.button2);
+			this.Controls.Add(this.button3);
 			this.Controls.Add(this.button1);
 			this.Name = "Form1";
 			this.Text = "Form1";
@@ -90,6 +102,7 @@ namespace Q {
 		private System.Windows.Forms.TextBox einput;
 		private System.Windows.Forms.TextBox emsg;
 		private System.Windows.Forms.Button button2;
+		private System.Windows.Forms.Button button3;
 	}
 }
 
