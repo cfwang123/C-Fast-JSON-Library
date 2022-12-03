@@ -1,5 +1,5 @@
 ﻿
-namespace MyJSON {
+namespace Q {
 	partial class Form1 {
 		/// <summary>
 		/// Required designer variable.

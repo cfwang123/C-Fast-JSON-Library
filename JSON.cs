@@ -7,13 +7,12 @@ using System.Runtime.Remoting.Channels;
 using System.Runtime.Remoting.Messaging;
 using System.Text;
 
-namespace Q.JSON {
+namespace Q {
 
 	public struct JSON : IEnumerable<JSON> {
 		public static JSON NOTEXIST = new JSON(NodeType.NotExist, default, null);
-		static DateTime EPOCH = new DateTime(1970, 1, 1);
 
-		public enum NodeType { Null = 0, Array, Object, Int, Long, Float, Double, DateTime, Bool, Decimal, String, CustomObject, Expression, NotExist }
+		public enum NodeType { NotExist = 0, Null, Array, Object, Int, Long, Float, Double, DateTime, Bool, Decimal, String, ByteArray, CustomObject, Expression }
 		public NodeType type;
 		public DWord val; //i32 i64 float double datetime
 		public object oval;
@@ -23,10 +22,11 @@ namespace Q.JSON {
 			this.oval = oval;
 		}
 
+		public bool IsNull => type == NodeType.Null || type == NodeType.NotExist;
+
 		public ref JSON this[int index] {
 			get {
-				if(type == NodeType.Array) {
-					var arr = oval as RefList<JSON>;
+				if(oval is RefList<JSON> arr) {
 					if(index >= 0 && index < arr.Count)
 						return ref arr[index];
 				}
@@ -36,8 +36,7 @@ namespace Q.JSON {
 
 		public ref JSON this[string key] {
 			get {
-				if(type == NodeType.Object) {
-					var arr = oval as RefDict<string,JSON>;
+				if(oval is RefDict<string,JSON> arr) {
 					if(arr.posmap.TryGetValue(key, out int pos))
 						return ref arr.items[pos];
 					else {
@@ -60,13 +59,21 @@ namespace Q.JSON {
 
 		public int Count {
 			get {
-				if(type == NodeType.Array) return (oval as RefList<JSON>).Count;
-				else if(type == NodeType.Object) return (oval as RefDict<string, JSON>).Count;
+				if(oval is RefList<JSON> arr) return arr.Count;
+				else if(oval is RefDict<string, JSON> obj) return obj.Count;
 				else return 0;
 			}
 		}
 
 		public void Add(string key, JSON value) {
+			if(type != NodeType.Object) return;
+			var map = oval as RefDict<string, JSON>;
+			if(map.posmap.TryGetValue(key, out int pos))
+				map.items[pos] = value;
+			else map.Add(key, value);
+		}
+
+		public void Add(string key, ref JSON value) {
 			if(type != NodeType.Object) return;
 			var map = oval as RefDict<string, JSON>;
 			if(map.posmap.TryGetValue(key, out int pos))
@@ -80,14 +87,20 @@ namespace Q.JSON {
 			arr.Add(value);
 		}
 
+		public void Add(ref JSON value) {
+			if(type != NodeType.Array) return;
+			var arr = oval as RefList<JSON>;
+			arr.Add(value);
+		}
+
 		public void Clear() {
-			if(type == NodeType.Array) (oval as RefList<JSON>).Clear();
-			else if(type == NodeType.Object) (oval as RefDict<string, JSON>).Clear();
+			if(oval is RefList<JSON> arr) arr.Clear();
+			else if(oval is RefDict<string, JSON> obj) obj.Clear();
 		}
 
 		public void EnsureCapacity(int capacity) {
-			if(type == NodeType.Array) (oval as RefList<JSON>).Capacity = capacity;
-			else if(type == NodeType.Object) (oval as RefDict<string, JSON>).Capacity = capacity;
+			if(oval is RefList<JSON> arr) arr.Capacity = capacity;
+			else if(oval is RefDict<string, JSON> obj) obj.Capacity = capacity;
 		}
 
 		public string Value {
@@ -97,11 +110,20 @@ namespace Q.JSON {
 					case NodeType.String: return (string)oval;
 					case NodeType.Int: return val.ival.ToString();
 					case NodeType.Long: return val.lval.ToString();
-					case NodeType.Float: return val.fval.ToString();
-					case NodeType.Double: return val.dval.ToString();
+					case NodeType.Float:
+						if(float.IsNaN(val.fval)) return "NaN";
+						else if(float.IsPositiveInfinity(val.fval)) return "Inf";
+						else if(float.IsNegativeInfinity(val.fval)) return "-Inf";
+						else return val.fval.ToString();
+					case NodeType.Double:
+						if(double.IsNaN(val.dval)) return "NaN";
+						else if(double.IsPositiveInfinity(val.dval)) return "Inf";
+						else if(double.IsNegativeInfinity(val.dval)) return "-Inf";
+						else return val.dval.ToString();
 					case NodeType.Bool: return val.boolval ? "1" : "0";
 					case NodeType.DateTime: return val.timeval.ToString("yyyy-MM-dd HH:mm:ss");
 					case NodeType.Decimal: return ((decimal)oval).ToString();
+					case NodeType.ByteArray: return bin2hex((byte[])oval);
 					case NodeType.Array: return "[Array]";
 					case NodeType.Object: return "[Object]";
 					case NodeType.CustomObject: return oval.ToString();
@@ -128,11 +150,12 @@ namespace Q.JSON {
 					case NodeType.Decimal: return (int)(decimal)oval;
 					default: return 0;
 				}
-			}
+			}	
 			set {
 				if(type == NodeType.NotExist) return;
 				type = NodeType.Int;
 				val.ival = value;
+				oval = null;
 			}
 		}
 
@@ -154,6 +177,7 @@ namespace Q.JSON {
 				if(type == NodeType.NotExist) return;
 				type = NodeType.Long;
 				val.lval = value;
+				oval = null;
 			}
 		}
 
@@ -169,12 +193,12 @@ namespace Q.JSON {
 					case NodeType.Bool: return val.boolval ? 1 : 0;
 					case NodeType.Decimal: return (float)(decimal)oval;
 					default: return 0;
-				}
-			}
+				}			}
 			set {
 				if(type == NodeType.NotExist) return;
 				type = NodeType.Float;
 				val.fval = value;
+				oval = null;
 			}
 		}
 
@@ -196,6 +220,7 @@ namespace Q.JSON {
 				if(type == NodeType.NotExist) return;
 				type = NodeType.Double;
 				val.dval = value;
+				oval = null;
 			}
 		}
 
@@ -220,7 +245,8 @@ namespace Q.JSON {
 			}
 		}
 
-		public DateTime AsDatetime {
+		static readonly DateTime EPOCH = new DateTime(1970, 1, 1);
+		public DateTime AsDateTime {
 			get {
 				ParseExpression();
 				switch(type) {
@@ -233,6 +259,7 @@ namespace Q.JSON {
 				if(type == NodeType.NotExist) return;
 				type = NodeType.DateTime;
 				val.timeval = value;
+				oval = null;
 			}
 		}
 
@@ -256,6 +283,36 @@ namespace Q.JSON {
 				if(type == NodeType.NotExist) return;
 				type = NodeType.Bool;
 				val.boolval = value;
+				oval = null;
+			}
+		}
+
+		public byte[] AsByteArray {
+			get {
+				if(type == NodeType.ByteArray)
+					return (byte[])oval;
+				else return new byte[0];
+			}
+			set {
+				if(type == NodeType.NotExist) return;
+				type = NodeType.ByteArray;
+				oval = value;
+			}
+		}
+
+		public JSON AsObject {
+			get {
+				if(type == NodeType.Object)
+					return this;
+				else return newObject();
+			}
+		}
+
+		public JSON AsArray {
+			get {
+				if(type == NodeType.Array)
+					return this;
+				else return newArray();
 			}
 		}
 
@@ -268,15 +325,22 @@ namespace Q.JSON {
 		}
 
 		public static JSON newArray(params JSON[] items) {
-			var list = new RefList<JSON>();
-			list.AddRange(items);
+			var list = new RefList<JSON>(items.Length);
+			int i;
+			for(i = 0;i < items.Length - 1;i++)
+				list.Add(ref items[i]);
+			if(items.Length > 0 && items[i].type != NodeType.NotExist)
+				list.Add(ref items[i]);
 			return new JSON(NodeType.Array, default, list);
 		}
 
 		public static JSON newObject(params (string, JSON)[] items) {
 			var map = new RefDict<string, JSON>();
-			foreach(var (k,v) in items)
-				map.Add(k, v);
+			int i;
+			for(i = 0;i < items.Length - 1;i++)
+				map.Add(items[i].Item1, ref items[i].Item2);
+			if(items.Length > 0 && items[i].Item1 != null && items[i].Item2.type != NodeType.NotExist)
+				map.Add(items[i].Item1, ref items[i].Item2);
 			return new JSON(NodeType.Object, default, map);
 		}
 		public static JSON NULL => new JSON(NodeType.Null, default, null);
@@ -285,9 +349,10 @@ namespace Q.JSON {
 		public static JSON newData(float v) => new JSON(NodeType.Float, DWord.make(v), null);
 		public static JSON newData(double v) => new JSON(NodeType.Double, DWord.make(v), null);
 		public static JSON newData(DateTime v) => new JSON(NodeType.DateTime, DWord.make(v), null);
-		public static JSON newData(bool v) => new JSON(NodeType.Bool, DWord.make(v ? 1 : 0), null);
+		public static JSON newData(bool v) => new JSON(NodeType.Bool, DWord.make(v), null);
 		public static JSON newData(decimal v) => new JSON(NodeType.Decimal, default, v);
-		public static JSON newData(string v) => new JSON(NodeType.String, default, v);
+		public static JSON newData(string v) => new JSON(v==null ? NodeType.Null : NodeType.String, default, v);
+		public static JSON newData(byte[] v) => new JSON(NodeType.ByteArray, default, v);
 		public static JSON newCustomData(object v) => new JSON(NodeType.CustomObject, default, v);
 
 		public static implicit operator JSON(bool b) => JSON.newData(b);
@@ -298,27 +363,28 @@ namespace Q.JSON {
 		public static implicit operator JSON(DateTime b) => JSON.newData(b);
 		public static implicit operator JSON(decimal b) => JSON.newData(b);
 		public static implicit operator JSON(string b) => JSON.newData(b);
+		public static implicit operator JSON(byte[] b) => JSON.newData(b);
 		public static implicit operator string(JSON b) => b.Value;
 
 		public IEnumerator<JSON> GetEnumerator() {
-			if(type == NodeType.Array) {
-				foreach(var v in (RefList<JSON>)oval)
+			if(oval is RefList<JSON> arr) {
+				foreach(var v in arr)
 					yield return v;
 			}
-			else if(type == NodeType.Object) {
-				foreach(var v in (RefDict<string,JSON>)oval)
+			else if(oval is RefDict<string, JSON> obj) {
+				foreach(var v in obj)
 					yield return v.Item2;
 			}
 		}
 
 		public IEnumerable<JSON> Vals {
 			get {
-				if(type == NodeType.Array) {
-					foreach(var v in (RefList<JSON>)oval)
+				if(oval is RefList<JSON> arr) {
+					foreach(var v in arr)
 						yield return v;
 				}
-				else if(type == NodeType.Object) {
-					foreach(var v in (RefDict<string,JSON>)oval)
+				else if(oval is RefDict<string, JSON> obj) {
+					foreach(var v in obj)
 						yield return v.Item2;
 				}
 			}
@@ -326,8 +392,8 @@ namespace Q.JSON {
 
 		public IEnumerable<string> Keys {
 			get {
-				if(type == NodeType.Object) {
-					foreach(var v in (RefDict<string,JSON>)oval)
+				if(oval is RefDict<string, JSON> obj) {
+					foreach(var v in obj)
 						yield return v.Item1;
 				}
 			}
@@ -335,47 +401,58 @@ namespace Q.JSON {
 
 		public IEnumerable<(string,JSON)> KeyVals {
 			get {
-				if(type == NodeType.Object) {
-					foreach(var v in (RefDict<string, JSON>)oval)
+				if(oval is RefDict<string, JSON> obj) {
+					foreach(var v in obj)
 						yield return v;
 				}
 			}
 		}
 
 		IEnumerator IEnumerable.GetEnumerator() {
-			if(type == NodeType.Array) {
-				foreach(var v in (RefList<JSON>)oval)
+			if(oval is RefList<JSON> arr) {
+				foreach(var v in arr)
 					yield return v;
 			}
-			else if(type == NodeType.Object) {
-				foreach(var v in (RefDict<string,JSON>)oval)
+			else if(oval is RefDict<string, JSON> obj) {
+				foreach(var v in obj)
 					yield return v.Item2;
 			}
 		}
 
 		[ThreadStatic] static StringBuilder _sb;
 		public override string ToString() {
+			return ToString(-1);
+		}
+
+		public string ToString(int pre = -1) {
+			if(type == NodeType.Array || type == NodeType.Object) {
+				_sb = _sb ?? new StringBuilder(2000);
+				ToJSONString(_sb, pre);
+				string s = _sb.ToString();
+				_sb.Clear();
+				return s;
+			}
+			else return Value;
+		}
+
+		public string ToJSONString(int pre = -1) {
 			_sb = _sb ?? new StringBuilder(2000);
-			ToString(_sb);
+			ToJSONString(_sb, pre);
 			string s = _sb.ToString();
 			_sb.Clear();
 			return s;
 		}
 
-		public string ToString(int pre) {
-			_sb = _sb ?? new StringBuilder(2000);
-			ToString(_sb, pre);
-			string s = _sb.ToString();
-			_sb.Clear();
-			return s;
-		}
-
-		public void ToString(StringBuilder sb, int pre = -1) {
+		public void ToJSONString(StringBuilder sb, int pre = -1) {
 			bool dl = false;
 			int i, j, len;
 			switch(type) {
 				case NodeType.Array:
 					var arr = oval as RefList<JSON>;
+					if(arr.Count == 0) {
+						sb.Append("[]");
+						break;
+					}
 					sb.Append('[');
 					if(pre >= 0) {
 						sb.Append("\r\n");
@@ -390,7 +467,7 @@ namespace Q.JSON {
 							}
 						}
 						else dl = true;
-						arr[i].ToString(sb, pre >= 0 ? (pre + 1) : -1);
+						arr[i].ToJSONString(sb, pre >= 0 ? (pre + 1) : -1);
 					}
 					if(pre >= 0) {
 						sb.Append("\r\n");
@@ -400,6 +477,10 @@ namespace Q.JSON {
 					break;
 				case NodeType.Object:
 					var map = oval as RefDict<string,JSON>;
+					if(map.Count == 0) {
+						sb.Append("{}");
+						break;
+					}
 					sb.Append('{');
 					if(pre >= 0) {
 						sb.Append("\r\n");
@@ -417,13 +498,18 @@ namespace Q.JSON {
 						sb.Append('"');
 						Escape(key, sb);
 						sb.Append("\":");
-						map[key].ToString(sb, pre >= 0 ? (pre + 1) : -1);
+						map[key].ToJSONString(sb, pre >= 0 ? (pre + 1) : -1);
 					}
 					if(pre >= 0) {
 						sb.Append("\r\n");
 						for(j = 1;j <= pre;j++) sb.Append("  ");
 					}
 					sb.Append('}');
+					break;
+				case NodeType.ByteArray:
+					sb.Append('"');
+					sb.Append(bin2hex((byte[])oval));
+					sb.Append('"');
 					break;
 				case NodeType.String:
 					sb.Append('"');
@@ -443,13 +529,21 @@ namespace Q.JSON {
 					sb.Append(val.lval);
 					break;
 				case NodeType.Float:
-					if(float.IsNaN(val.fval) || float.IsPositiveInfinity(val.fval) || float.IsNegativeInfinity(val.fval))
-						sb.Append(0);
+					if(float.IsNaN(val.fval))
+						sb.Append("\"NaN\"");
+					else if(float.IsPositiveInfinity(val.fval))
+						sb.Append("\"Inf\"");
+					else if(float.IsNegativeInfinity(val.fval))
+						sb.Append("\"-Inf\"");
 					else sb.Append(val.fval);
 					break;
 				case NodeType.Double:
-					if(double.IsNaN(val.dval) || double.IsPositiveInfinity(val.dval) || double.IsNegativeInfinity(val.dval))
-						sb.Append(0);
+					if(double.IsNaN(val.dval))
+						sb.Append("\"NaN\"");
+					else if(double.IsPositiveInfinity(val.dval))
+						sb.Append("\"Inf\"");
+					else if(double.IsNegativeInfinity(val.dval))
+						sb.Append("\"-Inf\"");
 					else sb.Append(val.dval);
 					break;
 				case NodeType.Decimal:
@@ -467,6 +561,28 @@ namespace Q.JSON {
 					break;
 				default: sb.Append("\"\"");break;
 			}
+		}
+
+		public static string bin2hex(byte[] bytes, int start = 0, int length = -1) {
+			if (bytes == null) return "NULL";
+			StringBuilder sb = new StringBuilder(length >= 0 ? length * 2 : bytes.Length * 2);
+			int end = length >= 0 ? Math.Min(bytes.Length, start + length) : bytes.Length;
+			char c1, c2;
+			byte b;
+			uint value;
+			for (int i = start; i < end; i++) {
+				b = bytes[i];
+				value = (uint)b % 16;
+				if (value < 10)
+					c2 = (char)('0' + value);
+				else c2 = (char)('A' + value - 10);
+				value = (uint)b / 16 % 16;
+				if (value < 10)
+					c1 = (char)('0' + value);
+				else c1 = (char)('A' + value - 10);
+				sb.Append(c1).Append(c2);
+			}
+			return sb.ToString();
 		}
 
 		static void Escape(string s, StringBuilder sb = null) {
@@ -489,7 +605,7 @@ namespace Q.JSON {
 			Stack<JSON> stack = new Stack<JSON>();
 			JSON ctx = new JSON(NodeType.Null, default, null);//源码初值为null
 			int i = 0;
-			var sToken = new StringBuilder(64);
+			StringBuilder sToken = new StringBuilder(64);
 			string TokenName = "";
 			int QuoteMode = 0;
 			while (i < aJSON.Length) {
@@ -526,8 +642,8 @@ namespace Q.JSON {
 						stack.Push(newObject());
 						if (ctx.type != NodeType.Null) {
 							TokenName = TokenName.Trim();
-							if (ctx.type == NodeType.Array)
-								ctx.Add(stack.Peek());
+							if(ctx.oval is RefList<JSON> arr)
+								arr.Add(stack.Peek());
 							else if (TokenName != "")
 								ctx.Add(TokenName, stack.Peek());
 						}
@@ -544,8 +660,8 @@ namespace Q.JSON {
 						stack.Push(newArray());
 						if (ctx.type != NodeType.Null) {
 							TokenName = TokenName.Trim();
-							if (ctx.type == NodeType.Array)
-								ctx.Add(stack.Peek());
+							if(ctx.oval is RefList<JSON> arr)
+								arr.Add(stack.Peek());
 							else if (TokenName != "")
 								ctx.Add(TokenName, stack.Peek());
 						}
@@ -565,10 +681,9 @@ namespace Q.JSON {
 						stack.Pop();
 						TokenName = TokenName.Trim();
 						if (sToken.Length > 0 || QuoteMode == 2) {
-							if (ctx.type == NodeType.Array)
-								ctx.Add(t1(sToken.ToString(), QuoteMode, runexp));
-							else
-								ctx.Add(TokenName, t1(sToken.ToString(), QuoteMode, runexp));
+							if(ctx.oval is RefList<JSON> arr)
+								arr.Add(t1(sToken.ToString(), QuoteMode, runexp));
+							else ctx.Add(TokenName, t1(sToken.ToString(), QuoteMode, runexp));
 						}
 						TokenName = "";
 						sToken.Clear();
@@ -596,8 +711,8 @@ namespace Q.JSON {
 						}
 						TokenName = TokenName.Trim();
 						if (sToken.Length > 0 || QuoteMode == 2) {
-							if (ctx.type == NodeType.Array)
-								ctx.Add(t1(sToken.ToString(), QuoteMode, runexp));
+							if(ctx.oval is RefList<JSON> arr)
+								arr.Add(t1(sToken.ToString(), QuoteMode, runexp));
 							else if (TokenName != "")
 								ctx.Add(TokenName, t1(sToken.ToString(), QuoteMode, runexp));
 						}
@@ -698,42 +813,27 @@ namespace Q.JSON {
 			}
 		}
 
-		public enum TypeEnum {
-			Undefined = 0,
-			Null = 1,
-			Bool = 2,
-			String = 3,
-			Byte = 4,
-			SByte = 5,
-			Short = 6,
-			UShort = 7,
-			Int = 8,
-			UInt = 9,
-			Long = 10,
-			ULong = 11,
-			Float = 12,
-			Double = 13,
-			Decimal = 14,
-			Char = 15,
-			Datetime = 16,
-		}
-		public static Dictionary<Type, TypeEnum> TYPEENUMMAP = new Dictionary<Type, TypeEnum> {
-			{typeof(bool),TypeEnum.Bool},
-			{typeof(string),TypeEnum.String},
-			{typeof(byte),TypeEnum.Byte},
-			{typeof(sbyte),TypeEnum.SByte},
-			{typeof(short),TypeEnum.Short},
-			{typeof(ushort),TypeEnum.UShort},
-			{typeof(int),TypeEnum.Int},
-			{typeof(uint),TypeEnum.UInt},
-			{typeof(long),TypeEnum.Long},
-			{typeof(ulong),TypeEnum.ULong},
-			{typeof(float),TypeEnum.Float},
-			{typeof(double),TypeEnum.Double},
-			{typeof(decimal),TypeEnum.Decimal},
-			{typeof(char),TypeEnum.Char},
-			{typeof(DateTime),TypeEnum.Datetime},
+		static HashSet<Type> __JSONDataTypes = new HashSet<Type> {
+			typeof(byte),
+			typeof(sbyte),
+			typeof(short),
+			typeof(ushort),
+			typeof(int),
+			typeof(uint),
+			typeof(long),
+			typeof(ulong),
+			typeof(float),
+			typeof(double),
+			typeof(decimal),
+			typeof(DateTime),
+			typeof(bool),
+			typeof(string),
+			typeof(byte[]),
 		};
+		public static bool IsJSONDataType(object o) {
+			if (o == null) return true;
+			return __JSONDataTypes.Contains(o.GetType());
+		}
 		public static JSON ToJSONData(object o) {
 			if(o == null) return NULL;
 			if(TYPEENUMMAP.TryGetValue(o.GetType(), out var typ)) {
@@ -752,10 +852,49 @@ namespace Q.JSON {
 					case TypeEnum.Datetime: return (DateTime)o;
 					case TypeEnum.String: return (string)o;
 					case TypeEnum.Bool: return (bool)o;
+					case TypeEnum.ByteArray: return new JSON(NodeType.ByteArray, default, (byte[])o);
 				}
 			}
 			return NULL;
 		}
+		enum TypeEnum {
+			Undefined = 0,
+			Null = 1,
+			Bool = 2,
+			String = 3,
+			Byte = 4,
+			SByte = 5,
+			Short = 6,
+			UShort = 7,
+			Int = 8,
+			UInt = 9,
+			Long = 10,
+			ULong = 11,
+			Float = 12,
+			Double = 13,
+			Decimal = 14,
+			Char = 15,
+			ByteArray = 16,
+			Datetime = 17,
+		}
+		static Dictionary<Type, TypeEnum> TYPEENUMMAP = new Dictionary<Type, TypeEnum> {
+			{typeof(bool),TypeEnum.Bool},
+			{typeof(string),TypeEnum.String},
+			{typeof(byte),TypeEnum.Byte},
+			{typeof(sbyte),TypeEnum.SByte},
+			{typeof(short),TypeEnum.Short},
+			{typeof(ushort),TypeEnum.UShort},
+			{typeof(int),TypeEnum.Int},
+			{typeof(uint),TypeEnum.UInt},
+			{typeof(long),TypeEnum.Long},
+			{typeof(ulong),TypeEnum.ULong},
+			{typeof(float),TypeEnum.Float},
+			{typeof(double),TypeEnum.Double},
+			{typeof(decimal),TypeEnum.Decimal},
+			{typeof(char),TypeEnum.Char},
+			{typeof(byte[]),TypeEnum.ByteArray},
+			{typeof(DateTime),TypeEnum.Datetime},
+		};
 
 		public object GetValueObject() {
 			switch(type) {
@@ -1000,5 +1139,6 @@ namespace Q.JSON {
 		public static DWord make(float b) => new DWord { fval = b };
 		public static DWord make(double b) => new DWord { dval = b };
 		public static DWord make(DateTime b) => new DWord { timeval = b };
+		public static DWord make(bool b) => new DWord { boolval = b };
 	}
 }

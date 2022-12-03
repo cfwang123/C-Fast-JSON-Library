@@ -6,9 +6,8 @@ using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
-using Q.JSON;
 
-namespace MyJSON {
+namespace Q {
 	public partial class Form1 : Form {
 		public Form1() {
 			InitializeComponent();
