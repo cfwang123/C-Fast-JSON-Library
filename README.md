@@ -6,7 +6,7 @@ This JSON library an be used to parse, generate JSON string. It can also be used
 Features:
 - Single struct implementation instead of using classes
 - Memory efficient, no boxing for integer and float values. This also means less memory indirections and faster speed.
-- Convert JSON struct to a very compact binary format, and parse JSON struct in binary data.
+- Compact binary format serialization and deserialization for JSON struct.
 
 In this library, a JSON value can contain one of the following values:
 1. Value types, using an 8-byte C union like structure to store:
