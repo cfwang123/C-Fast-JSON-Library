@@ -28,6 +28,22 @@ var js = JSON.newObject(
 );
 ```
 
+Alternatively, you can add a `default` at the end of list, this item will be omitted. In this way every item has a comma.
+```js
+var js = JSON.newObject(
+	("name", "abc"),
+	("height", 1.77),
+	("email", "123212331212"),
+	("contacts", JSON.newArray(
+		"contact 1",
+		"contact 2",
+		"contact 3",
+		default
+	)),
+	default
+);
+```
+
 2. Generate JSON string
 ```cs
 js.ToString(); //compact
